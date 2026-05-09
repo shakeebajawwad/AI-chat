@@ -1,24 +1,32 @@
 import { GoogleGenAI } from "@google/genai";
 import { Message } from "../types";
 
-// The platform handles injecting GEMINI_API_KEY into the environment, 
-// and we pass it via vite.config.ts define.
-const apiKey = process.env.GEMINI_API_KEY || "";
-const ai = new GoogleGenAI({ apiKey });
+// In Vite, process.env is replaced at build time via the define config in vite.config.ts.
+const getApiKey = () => {
+  try {
+    return process.env.GEMINI_API_KEY || "";
+  } catch (e) {
+    return "";
+  }
+};
 
 export async function* sendMessageStream(prompt: string, history: Message[] = []) {
+  const apiKey = getApiKey();
+  
   if (!apiKey) {
-    throw new Error("Lumina AI is not configured. Please ensure the GEMINI_API_KEY is active in the Secrets panel and refresh the page.");
+    throw new Error("Lumina AI is not configured. Please ensure your GEMINI_API_KEY is active in the Secrets panel and REFRESH the page to apply changes.");
   }
 
-  // Format history for Gemini API as per skill requirements
+  // Proper initialization using the modern SDK
+  const ai = new GoogleGenAI({ apiKey });
+
+  // Format history for the Gemini SDK
   const formattedHistory = history.map(msg => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: msg.content }]
   }));
 
   try {
-    // Model selection based on gemini-api skill
     const chat = ai.chats.create({
       model: "gemini-3-flash-preview",
       config: {
@@ -32,18 +40,19 @@ export async function* sendMessageStream(prompt: string, history: Message[] = []
     });
 
     for await (const chunk of streamResponse) {
-      // According to the skill, chunk.text is a property, not a method
       if (chunk.text) {
         yield chunk.text;
       }
     }
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
+    console.error("Lumina AI Error:", error);
     
-    if (error.message?.includes("API key not valid")) {
-      throw new Error("Lumina AI: The API key provided is invalid. Please check your Secrets in AI Studio.");
+    // Explicitly handle common API errors mapping to the "Dirty Dozen" or typical failures
+    const msg = error.message || "";
+    if (msg.includes("API key not valid") || msg.includes("INVALID_ARGUMENT") || error.status === 400) {
+      throw new Error("Lumina AI: The API key provided appears to be invalid. Please check your Secrets selection in AI Studio.");
     }
     
-    throw new Error(error.message || "Failed to generate response. Please try again.");
+    throw new Error(error.message || "Lumina AI encountered an unexpected error. Please try again.");
   }
 }
