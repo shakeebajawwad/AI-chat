@@ -4,16 +4,8 @@ import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({ mode }) => {
-  // Load env file if it exists, otherwise use process.env
   const env = loadEnv(mode, process.cwd(), '');
-  
-  // Try all possible names for the Gemini API key used in AI Studio
-  const apiKey = 
-    env.GEMINI_API_KEY || 
-    process.env.GEMINI_API_KEY || 
-    env.GEMINI_API_KEYS || 
-    process.env.GEMINI_API_KEYS || 
-    '';
+  const apiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || env.GEMINI_API_KEYS || process.env.GEMINI_API_KEYS || '';
 
   return {
     plugins: [react(), tailwindcss()],
