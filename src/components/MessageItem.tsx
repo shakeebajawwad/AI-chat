@@ -44,11 +44,13 @@ export default function MessageItem({ message }: MessageItemProps) {
         <div className={cn(
           "bubble p-4 rounded-2xl text-[15px] leading-relaxed",
           isUser 
-            ? "bg-accent-gradient text-white rounded-tr-none" 
+            ? "bg-accent-gradient text-white rounded-tr-none shadow-accent" 
             : "glass text-[#E2E8F0] rounded-tl-none border border-border"
         )}>
           {message.content ? (
-            <ReactMarkdown>{message.content}</ReactMarkdown>
+            <div className="prose prose-invert prose-p:leading-relaxed prose-pre:bg-secondary/50 prose-pre:border prose-pre:border-border prose-code:text-primary max-w-none">
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            </div>
           ) : (
             <div className="flex gap-1.5 py-2">
               <div className="w-2 h-2 rounded-full bg-white/30 animate-bounce [animation-delay:-0.3s]"></div>
