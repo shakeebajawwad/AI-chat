@@ -1,38 +1,55 @@
+import { GoogleGenAI } from "@google/genai";
 import { Message } from "../types";
 
+// The API key is injected via vite.config.ts define
+const getApiKey = () => {
+  return process.env.GEMINI_API_KEY || "";
+};
+
 export async function* sendMessageStream(prompt: string, history: Message[] = []) {
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
+    throw new Error("Lumina AI: No API key found. Please ensure 'Gemini API' is selected in the Secrets panel and REFRESH the page.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
+
   try {
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ prompt, history }),
+    // Format history for the contents array
+    const contents = history.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+
+    // Add the current prompt
+    contents.push({
+      role: 'user',
+      parts: [{ text: prompt }]
     });
 
-    if (!response.ok) {
-      let errorMessage = "Lumina AI could not be reached.";
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorMessage;
-      } catch (e) {
-        errorMessage = `Server Error (${response.status}): The backend failed to process the request.`;
+    // Use the exact method from the gemini-api skill
+    const stream = await ai.models.generateContentStream({
+      model: "gemini-3-flash-preview",
+      contents: contents,
+      config: {
+        systemInstruction: "You are Lumina AI, a highly intelligent, helpful, and professional AI assistant. You provide accurate, conversational, and context-aware responses. Maintain a polite and aesthetically pleasing tone. Developed by Google AI Studio.",
+      },
+    });
+
+    for await (const chunk of stream) {
+      if (chunk.text) {
+        yield chunk.text;
       }
-      throw new Error(errorMessage);
-    }
-
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-
-    if (!reader) throw new Error("Connection lost while receiving response.");
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      yield decoder.decode(value, { stream: true });
     }
   } catch (error: any) {
-    console.error("Chat Stream Error:", error);
-    throw error;
+    console.error("Lumina AI SDK Error:", error);
+    
+    const msg = error.message || "";
+    if (msg.includes("API key not valid") || msg.includes("INVALID_ARGUMENT") || error.status === 400) {
+      throw new Error("Lumina AI: The API key provided is invalid. This can happen if the key is not correctly selected in AI Studio's Secrets panel or if there is a quota limit.");
+    }
+    
+    throw new Error(error.message || "An error occurred during AI generation.");
   }
 }
